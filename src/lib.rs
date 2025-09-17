@@ -2,10 +2,22 @@
 // Copyright (c) 2025 Proton AG
 // -----------------------------------------------------------------------------
 
+use proton_srp::{SRPAuth, SRPProofB64};
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int};
 use std::slice;
-use proton_srp::{SRPAuth, SRPProofB64};
+
+const ERROR_CODE: c_int = -1;
+const ERR_NULL_PARAMETER: &str = "One or more required parameters is null";
+const ERR_INVALID_UTF8_PASSWORD: &str = "Invalid UTF-8 in password data";
+const ERR_INVALID_UTF8_SALT: &str = "Invalid UTF-8 in salt parameter";
+const ERR_INVALID_UTF8_MODULUS: &str = "Invalid UTF-8 in modulus parameter";
+const ERR_INVALID_UTF8_CHALLENGE: &str = "Invalid UTF-8 in server_challenge parameter";
+const ERR_CONVERT_CLIENT_EPHEMERAL: &str = "Failed to convert client_ephemeral to C string";
+const ERR_CONVERT_CLIENT_PROOF: &str = "Failed to convert client_proof to C string";
+const ERR_CONVERT_EXPECTED_SERVER_PROOF: &str = "Failed to convert expected_server_proof to C string";
+const ERR_CREATE_SRP_CLIENT: &str = "Failed to create SRP client:";
+const ERR_GENERATE_PROOFS: &str = "Failed to generate proofs:";
 
 #[repr(C)]
 pub struct CSRPProof {
@@ -29,9 +41,15 @@ pub unsafe extern "C" fn generate_proof(
     out_proof: *mut CSRPProof,
     out_error: *mut *mut c_char,
 ) -> c_int {
-    if password_data.is_null() || password_len == 0 || salt.is_null() || modulus.is_null() || server_challenge.is_null() || out_proof.is_null() {
-        set_error_message(out_error, "One or more required parameters is null");
-        return -1;
+    if password_data.is_null()
+        || password_len == 0
+        || salt.is_null()
+        || modulus.is_null()
+        || server_challenge.is_null()
+        || out_proof.is_null()
+    {
+        set_error_message(out_error, ERR_NULL_PARAMETER);
+        return ERROR_CODE;
     }
 
     // nosem: rust.lang.security.unsafe-usage.unsafe-usage
@@ -39,8 +57,8 @@ pub unsafe extern "C" fn generate_proof(
     let password_str = match String::from_utf8(password_slice.to_vec()) {
         Ok(s) => s,
         Err(_) => {
-            set_error_message(out_error, "Invalid UTF-8 in password data");
-            return -1;
+            set_error_message(out_error, ERR_INVALID_UTF8_PASSWORD);
+            return ERROR_CODE;
         }
     };
 
@@ -48,8 +66,8 @@ pub unsafe extern "C" fn generate_proof(
     let salt_str = match unsafe { CStr::from_ptr(salt).to_str() } {
         Ok(s) => s,
         Err(_) => {
-            set_error_message(out_error, "Invalid UTF-8 in salt parameter");
-            return -1;
+            set_error_message(out_error, ERR_INVALID_UTF8_SALT);
+            return ERROR_CODE;
         }
     };
 
@@ -57,8 +75,8 @@ pub unsafe extern "C" fn generate_proof(
     let modulus_str = match unsafe { CStr::from_ptr(modulus).to_str() } {
         Ok(s) => s,
         Err(_) => {
-            set_error_message(out_error, "Invalid UTF-8 in modulus parameter");
-            return -1;
+            set_error_message(out_error, ERR_INVALID_UTF8_MODULUS);
+            return ERROR_CODE;
         }
     };
 
@@ -66,13 +84,13 @@ pub unsafe extern "C" fn generate_proof(
     let challenge_str = match unsafe { CStr::from_ptr(server_challenge).to_str() } {
         Ok(s) => s,
         Err(_) => {
-            set_error_message(out_error, "Invalid UTF-8 in server_challenge parameter");
-            return -1;
+            set_error_message(out_error, ERR_INVALID_UTF8_CHALLENGE);
+            return ERROR_CODE;
         }
     };
 
     let verifier = proton_srp::RPGPVerifier::default();
-    
+
     let client = match SRPAuth::new(
         &verifier,
         &password_str,
@@ -83,8 +101,8 @@ pub unsafe extern "C" fn generate_proof(
     ) {
         Ok(c) => c,
         Err(e) => {
-            set_error_message(out_error, &format!("Failed to create SRP client: {e}"));
-            return -1;
+            set_error_message(out_error, &format!("{ERR_CREATE_SRP_CLIENT} {e}"));
+            return ERROR_CODE;
         }
     };
 
@@ -95,24 +113,24 @@ pub unsafe extern "C" fn generate_proof(
             let client_ephemeral = match CString::new(proof_b64.client_ephemeral) {
                 Ok(s) => s.into_raw(),
                 Err(_) => {
-                    set_error_message(out_error, "Failed to convert client_ephemeral to C string");
-                    return -1;
+                    set_error_message(out_error, ERR_CONVERT_CLIENT_EPHEMERAL);
+                    return ERROR_CODE;
                 }
             };
 
             let client_proof = match CString::new(proof_b64.client_proof) {
                 Ok(s) => s.into_raw(),
                 Err(_) => {
-                    set_error_message(out_error, "Failed to convert client_proof to C string");
-                    return -1;
+                    set_error_message(out_error, ERR_CONVERT_CLIENT_PROOF);
+                    return ERROR_CODE;
                 }
             };
 
             let expected_server_proof = match CString::new(proof_b64.expected_server_proof) {
                 Ok(s) => s.into_raw(),
                 Err(_) => {
-                    set_error_message(out_error, "Failed to convert expected_server_proof to C string");
-                    return -1;
+                    set_error_message(out_error, ERR_CONVERT_EXPECTED_SERVER_PROOF);
+                    return ERROR_CODE;
                 }
             };
 
@@ -126,8 +144,8 @@ pub unsafe extern "C" fn generate_proof(
             0
         }
         Err(e) => {
-            set_error_message(out_error, &format!("Failed to generate proofs: {e}"));
-            -1
+            set_error_message(out_error, &format!("{ERR_GENERATE_PROOFS} {e}"));
+            ERROR_CODE
         }
     }
 }
