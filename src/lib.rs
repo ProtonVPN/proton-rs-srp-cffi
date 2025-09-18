@@ -9,6 +9,7 @@ use std::slice;
 
 const ERROR_CODE: c_int = -1;
 const ERR_NULL_PARAMETER: &str = "One or more required parameters is null";
+const ERR_PASSWORD_LENGTH: &str = "Password length must be greater than zero";
 const ERR_INVALID_UTF8_PASSWORD: &str = "Invalid UTF-8 in password data";
 const ERR_INVALID_UTF8_SALT: &str = "Invalid UTF-8 in salt parameter";
 const ERR_INVALID_UTF8_MODULUS: &str = "Invalid UTF-8 in modulus parameter";
@@ -42,13 +43,17 @@ pub unsafe extern "C" fn generate_proof(
     out_error: *mut *mut c_char,
 ) -> c_int {
     if password_data.is_null()
-        || password_len == 0
         || salt.is_null()
         || modulus.is_null()
         || server_challenge.is_null()
         || out_proof.is_null()
     {
         set_error_message(out_error, ERR_NULL_PARAMETER);
+        return ERROR_CODE;
+    }
+
+    if password_len == 0 {
+        set_error_message(out_error, ERR_PASSWORD_LENGTH);
         return ERROR_CODE;
     }
 
