@@ -14,4 +14,4 @@ version  = "0.7"
 registry = "proton"
 
 [build-dependencies]
-winres = "0.1"
+winresource = "0.1"

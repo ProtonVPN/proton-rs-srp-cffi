@@ -6,7 +6,7 @@ fn main() {
         return;
     }
 
-    let mut res = winres::WindowsResource::new();
+    let mut res = winresource::WindowsResource::new();
 
     let major = env::var("CARGO_PKG_VERSION_MAJOR").unwrap();
     let minor = env::var("CARGO_PKG_VERSION_MINOR").unwrap();
@@ -29,8 +29,8 @@ fn main() {
     res.set("FileVersion",      &ver_dot);
     res.set("ProductVersion",   &ver_dot);
 
-    res.set_version_info(winres::VersionInfo::FILEVERSION, ver_num);
-    res.set_version_info(winres::VersionInfo::PRODUCTVERSION, ver_num);
+    res.set_version_info(winresource::VersionInfo::FILEVERSION, ver_num);
+    res.set_version_info(winresource::VersionInfo::PRODUCTVERSION, ver_num);
 
     res.compile().expect("resource compilation failed");
 
